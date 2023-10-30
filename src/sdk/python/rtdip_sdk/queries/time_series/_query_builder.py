@@ -602,7 +602,8 @@ def _circular_stats_query(parameters_dict: dict) -> str:
     return sql_template.render(circular_stats_parameters)
 
 
-def _query_builder(parameters_dict: dict, query_type: str) -> str:
+def _query_builder(parameters_dict = None: dict, query_type: str, sql_query = None:str) -> str:
+    
     if "tag_names" not in parameters_dict:
         parameters_dict["tag_names"] = []
     tagnames_deduplicated = list(
@@ -620,6 +621,9 @@ def _query_builder(parameters_dict: dict, query_type: str) -> str:
 
     if query_type == "interpolation_at_time":
         return _interpolation_at_time(parameters_dict)
+    
+    if query_type == "sql":
+        return sql_query
 
     if query_type == "raw":
         return _raw_query(parameters_dict)

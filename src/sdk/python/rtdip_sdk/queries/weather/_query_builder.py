@@ -81,7 +81,7 @@ def _convert_to_seconds(s):
     return int(s[:-1]) * seconds_per_unit[s[-1]]
 
 
-def _raw_query(parameters_dict: dict) -> str:
+def _raw_query_grid(parameters_dict: dict) -> str:
     raw_query = (
         "SELECT DISTINCT from_utc_timestamp(to_timestamp(date_format(`{{ timestamp_column }}`, 'yyyy-MM-dd HH:mm:ss.SSS')), \"{{ time_zone }}\") AS `{{ timestamp_column }}`, `{{ tagname_column }}`, {% if include_status is defined and include_status == true %} `{{ status_column }}`, {% endif %} `{{ value_column }}` FROM "
         "{% if source is defined and source is not none %}"
@@ -89,7 +89,7 @@ def _raw_query(parameters_dict: dict) -> str:
         "{% else %}"
         "`{{ forecast|lower }}`.`weather`.`{{ region|lower }}_weather_{{ data_security_level|lower }}_events_{{ data_type|lower }}` "
         "{% endif %}"
-        "WHERE `{{ timestamp_column }}` BETWEEN to_timestamp(\"{{ start_date }}\") AND to_timestamp(\"{{ end_date }}\") "
+        'WHERE `{{ timestamp_column }}` BETWEEN to_timestamp("{{ start_date }}") AND to_timestamp("{{ end_date }}") '
         "AND `{{ latitude_column }}` > '{{ min_lat}}' "
         "AND `{{ latitude_column }}` < '{{ max_lat}}' "
         "AND `{{ longitude_column }}` > '{{ min_lon}}' "
@@ -134,16 +134,68 @@ def _raw_query(parameters_dict: dict) -> str:
         and parameters_dict.get("status_column") is None
         else parameters_dict.get("status_column", "Status"),
         "value_column": parameters_dict.get("value_column", "Value"),
-
     }
 
     sql_template = Template(raw_query)
     return sql_template.render(raw_parameters)
 
 
+def _raw_query_point(parameters_dict: dict) -> str:
+    raw_query = (
+        "SELECT DISTINCT from_utc_timestamp(to_timestamp(date_format(`{{ timestamp_column }}`, 'yyyy-MM-dd HH:mm:ss.SSS')), \"{{ time_zone }}\") AS `{{ timestamp_column }}`, `{{ tagname_column }}`, {% if include_status is defined and include_status == true %} `{{ status_column }}`, {% endif %} `{{ value_column }}` FROM "
+        "{% if source is defined and source is not none %}"
+        "`{{ source|lower }}` "
+        "{% else %}"
+        "`{{ forecast|lower }}`.`weather`.`{{ region|lower }}_weather_{{ data_security_level|lower }}_events_{{ data_type|lower }}` "
+        "{% endif %}"
+        'WHERE `{{ timestamp_column }}` BETWEEN to_timestamp("{{ start_date }}") AND to_timestamp("{{ end_date }}") '
+        "AND `{{ latitude_column }}` == '{{lat}}' "
+        "AND `{{ longitude_column }}` == '{{lon}}' "
+        "{% if source is defined and source is not none %}"
+        "AND SOURCE = '{{ source }}' "
+        "{% endif %}"
+        "{% if include_status is defined and include_status == true and include_bad_data is defined and include_bad_data == false %}"
+        "AND `{{ status_column }}` = 'Good'"
+        "{% endif %}"
+        "ORDER BY `{{ tagname_column }}`, `{{ timestamp_column }}` "
+        "{% if limit is defined and limit is not none %}"
+        "LIMIT {{ limit }} "
+        "{% endif %}"
+    )
+
+    raw_parameters = {
+        "forecast": parameters_dict.get("forecast", None),
+        "region": parameters_dict.get("region"),
+        "data_security_level": parameters_dict.get("data_security_level"),
+        "data_type": parameters_dict.get("data_type"),
+        "start_date": parameters_dict["start_date"],
+        "end_date": parameters_dict["end_date"],
+        "lat": parameters_dict["lat"],
+        "lon": parameters_dict["lon"],
+        "source": parameters_dict.get("source", None),
+        "include_bad_data": parameters_dict["include_bad_data"],
+        "limit": parameters_dict.get("limit", None),
+        "latitude_column": parameters_dict.get("latitude_column", "Latitude"),
+        "longitude_column": parameters_dict.get("longitude_column", "Longitude"),
+        "time_zone": parameters_dict["time_zone"],
+        "tagname_column": parameters_dict.get("tagname_column", "TagName"),
+        "timestamp_column": parameters_dict.get("timestamp_column", "EventTime"),
+        "include_status": False
+        if "status_column" in parameters_dict
+        and parameters_dict.get("status_column") is None
+        else True,
+        "status_column": "Status"
+        if "status_column" in parameters_dict
+        and parameters_dict.get("status_column") is None
+        else parameters_dict.get("status_column", "Status"),
+        "value_column": parameters_dict.get("value_column", "Value"),
+    }
+
+    sql_template = Template(raw_query)
+    return sql_template.render(raw_parameters)
 
 
-def _latest_query(parameters_dict: dict) -> str:
+def _latest_query_grid(parameters_dict: dict) -> str:
     latest_query = (
         "SELECT * FROM "
         "{% if source is defined and source is not none %}"
@@ -180,7 +232,45 @@ def _latest_query(parameters_dict: dict) -> str:
         "latitude_column": parameters_dict.get("latitude_column", "Latitude"),
         "longitude_column": parameters_dict.get("longitude_column", "Longitude"),
         "tagname_column": parameters_dict.get("tagname_column", "TagName"),
+    }
 
+    sql_template = Template(latest_query)
+    return sql_template.render(latest_parameters)
+
+
+def _latest_query_point(parameters_dict: dict) -> str:
+    latest_query = (
+        "SELECT * FROM "
+        "{% if source is defined and source is not none %}"
+        "`{{ source|lower }}` "
+        "{% else %}"
+        "`{{ forecast|lower }}`.`weather`.`{{ region|lower }}_weather_{{ data_security_level|lower }}_events_{{ data_type|lower }}` "
+        "{% endif %}"
+        "WHERE `{{ latitude_column }}` == '{{lat}}' "
+        "AND `{{ longitude_column }}` == '{{lon}}' "
+        "{% if source is defined and source is not none %}"
+        "AND SOURCE = '{{ source }}' "
+        "{% endif %}"
+        "ORDER BY `{{ tagname_column }}` "
+        "{% if limit is defined and limit is not none %}"
+        "LIMIT {{ limit }} "
+        "{% endif %}"
+    )
+
+    latest_parameters = {
+        "forecast": parameters_dict.get("forecast", None),
+        "region": parameters_dict.get("region"),
+        "data_security_level": parameters_dict.get("data_security_level"),
+        "data_type": parameters_dict.get("data_type"),
+        "start_date": parameters_dict["start_date"],
+        "end_date": parameters_dict["end_date"],
+        "lat": parameters_dict["lat"],
+        "lon": parameters_dict["lon"],
+        "source": parameters_dict.get("source", None),
+        "limit": parameters_dict.get("limit", None),
+        "latitude_column": parameters_dict.get("latitude_column", "Latitude"),
+        "longitude_column": parameters_dict.get("longitude_column", "Longitude"),
+        "tagname_column": parameters_dict.get("tagname_column", "TagName"),
     }
 
     sql_template = Template(latest_query)
@@ -195,12 +285,16 @@ def _query_builder(parameters_dict: dict, query_type: str) -> str:
     )  # remove potential duplicates in tags
     parameters_dict["tag_names"] = tagnames_deduplicated.copy()
 
-    if query_type == "latest":
-        return _latest_query(parameters_dict)
-
     parameters_dict = _parse_dates(parameters_dict)
 
-    if query_type == "raw":
-        return _raw_query(parameters_dict)
+    if query_type == "latest_point":
+        return _latest_query_point(parameters_dict)
 
-   
+    if query_type == "latest_grid":
+        return _latest_query_grid(parameters_dict)
+
+    if query_type == "raw_point":
+        return _raw_query_point(parameters_dict)
+
+    if query_type == "raw_grif":
+        return _raw_query_grid(parameters_dict)
