@@ -36,6 +36,21 @@ def test_query_builder_raw(mocker: MockerFixture):
     )
     assert data == {"test": "data"}
 
+def test_query_builder_sql(mocker: MockerFixture):
+    mocker.patch(
+        "src.sdk.python.rtdip_sdk.queries.query_builder.raw.get",
+        return_value={"test": "data"},
+    )
+
+    data = (
+        QueryBuilder()
+        .connect(MOCK_CONNECTION)
+        .sql(
+            "Select * from " + MOCK_TABLE
+        )
+    )
+    assert data == {"test": "data"}
+
 
 def test_query_builder_resample(mocker: MockerFixture):
     mocker.patch(
