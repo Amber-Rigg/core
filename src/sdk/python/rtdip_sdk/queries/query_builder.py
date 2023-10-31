@@ -16,6 +16,7 @@ from typing import Union
 from ..connectors.connection_interface import ConnectionInterface
 from .time_series import (
     raw,
+    sql,
     resample,
     interpolate,
     interpolation_at_time,
@@ -114,6 +115,21 @@ class QueryBuilder:
             "value_column": self.value_column,
         }
         return raw.get(self.connection, raw_parameters)
+    
+    def sql(
+        self,
+        sql_query: str,
+    ) -> DataFrame:
+        """
+        A function to return back SSIP data based off a SQL query
+
+        Args:
+            sql_query (str): SQL query to be executed
+
+        Returns:
+            DataFrame: A dataframe of raw timeseries data.
+        """
+        return raw.get(self.connection, sql_query)
 
     def resample(
         self,
